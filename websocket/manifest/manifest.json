@@ -1,0 +1,10 @@
+{
+	"name": "web-sockets",
+	"displayname": "web-sockets",
+	"dependencyName": "web-sockets",
+	"description": "web sockets to use with the Interstellar.TelemetrySystem",
+	"api_version": "2",
+	"version": "1.0",
+	"run_on_server": true,
+	"run_on_client": false
+}

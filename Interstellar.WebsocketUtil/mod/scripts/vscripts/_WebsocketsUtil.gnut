@@ -1,0 +1,18 @@
+untyped
+
+global function HeaderConverter
+
+string function HeaderConverter(table<string,string> headerTable)
+{
+	array<string> newString
+	foreach(string key, string val in headerTable)
+	{
+		newString.append(key + "|#!#|"+val+"|#!#|")
+	}
+
+	string returnString
+	foreach (item in newString) {
+		returnString += item
+	}
+	return returnString
+}
