@@ -1,10 +1,7 @@
 use rrplug::prelude::*;
 use rrplug::{
-    bindings::convar::FCVAR_GAMEDLL,
     sq_return_bool, sq_return_notnull, sq_return_null,
     wrappers::{
-        convars::ConVarRegister,
-        northstar::EngineLoadType,
         squirrel::push_sq_array,
     },
 };
@@ -38,15 +35,12 @@ use futures_util::{
 use std::sync::Mutex;
 use lazy_static::lazy_static;
 use tokio::runtime::Runtime;
-use rrplug::wrappers::convars::ConVarStruct;
 use futures_util::stream::SplitSink;
 
 
 struct WebSocketContainer
 {
     write: Arc<Mutex<SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>>>,
-   //read: Arc<Mutex<SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>>>,
-
 }
 
 lazy_static! {
@@ -58,120 +52,76 @@ lazy_static! {
 }
 
 #[derive(Debug)]
-pub struct ExamplePlugin
+pub struct WebsocketPlugin
 {}
 
 
-impl Plugin for ExamplePlugin {
-
+impl Plugin for WebsocketPlugin {
+    type SaveType = squirrel::Save;
 
     fn new() -> Self {
         Self {}
     }
 
     fn initialize(&mut self, plugin_data: &PluginData) {
-        log::info!("yay logging on initialize :D");
-
-        _ = plugin_data.register_sq_functions(info_example);
         _ = plugin_data.register_sq_functions(info_sq_connect_to_server);
         _ = plugin_data.register_sq_functions(info_sq_disconnect_from_server);
         _ = plugin_data.register_sq_functions(info_sq_write_message);
         _ = plugin_data.register_sq_functions(info_get_last_messages);
-
-
     }
 
     fn main(&self) {}
-
-
-    fn on_engine_load(&self, engine: &EngineLoadType) {
-        let engine = match engine {
-            EngineLoadType::Engine(engine) => engine,
-            EngineLoadType::EngineFailed => return,
-            EngineLoadType::Server => return,
-            EngineLoadType::Client => return,
-        };
-
-        let convar = ConVarStruct::try_new().unwrap();
-        let register_info = ConVarRegister {
-            callback: Some(basic_convar_changed_callback),
-            ..ConVarRegister::mandatory(
-                "basic_convar",
-                "48",
-                FCVAR_GAMEDLL.try_into().unwrap(),
-                "basic_convar",
-            )
-        };
-
-        convar.register(register_info).unwrap();
-
-        _ = engine.register_concommand(
-            "basic_command",
-            basic_command_callback,
-            "basic_command",
-            FCVAR_GAMEDLL.try_into().unwrap(),
-        );
-    }
-
-    type SaveType = squirrel::Save;
 }
 
-entry!(ExamplePlugin);
+entry!(WebsocketPlugin);
 
+#[rrplug::sqfunction(VM=server,ExportName=PL_ConnectToWebsocket)]
+fn sq_connect_to_server(socket_name: String, url: String, headers:String, connection_time_out: i32) -> bool {
+    log::info!("Trying to establish websocket connection [{socket_name}] to [{url}]" );
 
-#[rrplug::concommand]
-fn basic_command_callback(command: CCommandResult) {
-    log::info!("running basic_command");
-    log::info!("args: {:?}", command.args)
-}
-
-#[rrplug::convar]
-fn basic_convar_changed_callback(convar: Option<ConVarStruct>, old_value: String, float_old_value: f32) {
-    log::info!("old value: {}", float_old_value)
-}
-
-#[rrplug::sqfunction(VM=server,ExportName=BasicExample)]
- fn example(name: String) {
-    log::info!("exmaple {name} ");
-
-    sq_return_null!()
-}
-#[rrplug::sqfunction(VM=server,ExportName=NS_ConnectToWebsocket)]
-fn sq_connect_to_server(socket_name: String, url: String, headers:String) -> bool {
-
-
-    let mut was_success:bool = true;
-
-    if !STREAM_MAP.lock().unwrap().contains_key(&socket_name)
+    if STREAM_MAP.lock().unwrap().contains_key(&socket_name)
     {
-        was_success = RT.block_on(connect_to_server(socket_name,url,headers));
-
+        log::warn!("There is still a open websocket connection under [{socket_name}] closing websocket." );
+        disconnect_from_server(&socket_name);
     }
-    else {
-        log::warn!("Tried to establish a second connection on {url}" );
 
-    }
+    let was_success = RT.block_on(connect_to_server(socket_name,url,headers, connection_time_out as u64));
 
     sq_return_bool!(was_success, sqvm, sq_functions);
 }
 
-#[rrplug::sqfunction(VM=server,ExportName=NS_DisconnectFromWebsocket)]
-fn sq_disconnect_from_server(socket_name: String)
-{
-    disconnect_from_server(socket_name);
+#[rrplug::sqfunction(VM=server,ExportName=PL_DisconnectFromWebsocket)]
+fn sq_disconnect_from_server(socket_name: String) {
+    log::info!("Disconnecting websocket client [{socket_name}]");
+
+    disconnect_from_server(&socket_name);
 
     sq_return_null!();
 }
 
-#[rrplug::sqfunction(VM=server,ExportName=NS_WriteToWebsocket)]
-fn sq_write_message(socket_name:String, message:String){
+#[rrplug::sqfunction(VM=server,ExportName=PL_WriteToWebsocket)]
+fn sq_write_message(socket_name:String, message:String) {
+    log::trace!("Writing to websocket [{socket_name}] message [{message}]");
 
     RT.block_on(write_message(socket_name,message));
 
     sq_return_null!();
 }
 
-async fn write_message(socket_name : String, message: String){
+#[rrplug::sqfunction(VM=server,ExportName=PL_ReadFromWebsocket)]
+fn get_last_messages(socket_name: String) -> Vec<String> {
+    log::trace!("Trying to read from the websocket [{socket_name}] buffer");
+
+    let mut last_message_map = LAST_MESSAGE.lock().unwrap();
+    let  lock = last_message_map.get(&socket_name.clone()).unwrap().to_vec().clone();
+    last_message_map.get_mut(&socket_name).unwrap().clear();
+
+    push_sq_array(sqvm, sq_functions, lock);
+
+    sq_return_notnull!()
+}
+
+async fn write_message(socket_name : String, message: String) {
 
     // Retrieve the map
     let map_lock = STREAM_MAP.lock().unwrap();
@@ -184,50 +134,52 @@ async fn write_message(socket_name : String, message: String){
 
         // Send the message
         write
-            .send(tokio_tungstenite::tungstenite::Message::Text(message.clone()))
+            .send(Message::Text(message.clone()))
             .await
             .expect("Failed to write the message");
-        log::info!("Message send: [ {message} ]")
+        log::trace!("Message for [{socket_name}] was sent successful [{message}]")
 
     } else {
         // Handle the case when the WebSocketContainer is not found
-        log::error!("WebSocketContainer not found for socket_name: {}", socket_name);
+        log::warn!("There is no established connection for [{socket_name}]");
     }
 }
 
-fn disconnect_from_server(socket_name: String)
+fn disconnect_from_server(socket_name: &String)
 {
-    STREAM_MAP.lock().unwrap().remove(&socket_name);
+    STREAM_MAP.lock().unwrap().remove(socket_name);
 }
 
-async fn connect_to_server(socket_name: String, url_string: String, headers: String) -> bool {
-    log::info!("Trying to connect ...");
+async fn connect_to_server(socket_name: String, url_string: String, headers: String, connection_time_out: u64) -> bool {
+    log::debug!("Trying to establish websocket connection [{socket_name}]..." );
 
     let header: Vec<&str> = headers.split("|#!#|").collect();
 
-
-
     let can_connect: bool;
+
+    log::debug!("Config: [{socket_name}] url = [{url_string}]");
     let mut request = url_string.clone().into_client_request().unwrap();
 
     let headers = request.headers_mut();
 
+    log::debug!("Config: [{socket_name}] parsing headers...");
     for (header, value) in header.iter().step_by(2).zip(header.iter().skip(1).step_by(2)) {
         let header_name = HeaderName::from_str(header).unwrap();
         let header_value = HeaderValue::from_str(value).unwrap();
 
-        log::info!("Used modified header: {header} and {value}");
+        log::debug!("Config: [{socket_name}] Adding header [{header}] value: [{value}]");
 
         headers.insert(header_name, header_value);
     }
 
-    let timeout_duration = Duration::from_secs(5); // Set the desired timeout duration
+    log::debug!("Config: [{socket_name}] connection timeout [{}s]", connection_time_out);
+    let timeout_duration = Duration::from_secs(connection_time_out); // Set the desired timeout duration
 
     let connect_result = timeout(timeout_duration, connect_async(request)).await;
 
     match connect_result {
         Ok(Ok(socket_stream)) => {
-            log::info!("Connected to {url_string}");
+            log::info!("Connection successful for [{url_string}]");
 
             let (stream_stuff, _response) = socket_stream;
 
@@ -235,7 +187,6 @@ async fn connect_to_server(socket_name: String, url_string: String, headers: Str
 
             let new_container = WebSocketContainer {
                 write: Arc::new(Mutex::new(split_write)),
-                //read: Arc::new(Mutex::new(split_read)),
             };
 
             STREAM_MAP.lock().unwrap().insert(socket_name.clone(), new_container);
@@ -244,16 +195,17 @@ async fn connect_to_server(socket_name: String, url_string: String, headers: Str
             let socket_name_arc = Arc::new(socket_name.clone());
 
             tokio::spawn(async move {
+                log::info!("Spinning up listening thread for [{socket_name}]");
+
                 let socket_name_arc = socket_name_arc.clone();
-                //let name = &socket_name.clone();
+
                 let mut read_stream = split_read;
 
                 while let Some(message) = read_stream.next().await {
-                    let mut data = message.unwrap().into_data();
-                    data.push(b'\n');
-                    let s = String::from_utf8(data).expect("Found invalid UTF-8");
+                    let data = message.unwrap().into_data();
+                    let s = String::from_utf8(data).expect("Websocket provided invalid UTF-8");
 
-                    log::info!("From websocket {:?} : {:?}", socket_name_arc.clone() ,s.clone());
+                    log::trace!("Received message from Websocket [{:?}] message [{:?}]", socket_name_arc.clone() ,s.clone());
 
                     let lock = {
                         let socket_name_str = socket_name_arc.as_str().clone();
@@ -270,64 +222,14 @@ async fn connect_to_server(socket_name: String, url_string: String, headers: Str
             can_connect = true;
         }
         Ok(Err(e)) => {
-            log::error!("Failed to connect : {:#?}", e);
+            log::error!("Failed to connect to {socket_name} reason: {:#?}", e);
             can_connect = false;
         }
         Err(_) => {
-            log::error!("Connection timeout");
+            log::error!("Timeout was reached while trying to connect to [{socket_name}]");
             can_connect = false;
         }
     }
 
-
     can_connect
 }
-
-#[rrplug::sqfunction(VM=server,ExportName=NS_GetLastMessages)]
-fn get_last_messages(socket_name: String) -> Vec<String> {
-    let mut last_message_map = LAST_MESSAGE.lock().unwrap();
-    let  lock = last_message_map.get(&socket_name.clone()).unwrap().to_vec().clone();
-    last_message_map.get_mut(&socket_name).unwrap().clear();
-
-    push_sq_array(sqvm, sq_functions, lock);
-
-    sq_return_notnull!()
-}
-
-
-
-// Cut stuff for now :( rip last 3 hours
-//async fn check_if_socket_is_open(socket_name: &String) -> bool {
-/*
-    log::info!("Checking for socket connection! :D Fick dich neo");
-
-    let mut buffer = [0; 10];
-
-    let map = STREAM_MAP.lock().unwrap();
-
-
-
-
-    //let  data = map.get(&socket_name).unwrap().get_ref()
-
-    // Establish the connection
-
-    let ws_container= map.get(&socket_name.clone()).unwrap();
-
-    let mut write_mutex = ws_container.write.lock().unwrap();
-    let write = &mut *write_mutex;
-
-    let write_peek = write.peekable();
-
-    let data = write_peek.peek();
-
-    if data == None
-    {
-        return false;
-    }
-
-    return true;
-}
- */
-
-
