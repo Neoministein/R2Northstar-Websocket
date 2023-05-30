@@ -4,17 +4,18 @@ global function HeaderConverter
 
 global function NS_ConnectToWebsocket
 global function NS_WriteToWebsocket
+global function NS_PoolWebsocket
 global function NS_DisconnectFromWebsocket
 
 struct {
     table < string , bool> activeSocket
 } file
 
-bool function NS_ConnectToWebsocket(string socketName, string url, void functionref( string ) callbackReadFunc, int poolTimer = 1, table<string,string> headers = {}, int connectionTimeout = 5)
+bool function NS_ConnectToWebsocket(string socketName, string url, void functionref( string ) callbackReadFunc, int poolTimeInSec = 1, table<string,string> headers = {}, int connectionTimeout = 5)
 {
     file.activeSocket[socketName] <- PL_ConnectToWebsocket(socketName, url, HeaderConverter(headers) ,connectionTimeout)
 
-    thread NS_PoolWebsocket(socketName, callbackReadFunc, poolTimer)
+    thread NS_PoolWebsocket(socketName, callbackReadFunc, poolTimeInSec)
 
     return file.activeSocket[socketName]
 }
@@ -52,11 +53,11 @@ string function HeaderConverter(table<string,string> headerTable)
 	return returnString
 }
 
-void function NS_PoolWebsocket(string socketName, void functionref( string ) callbackReadFunc, int poolTimer)
+void function NS_PoolWebsocket(string socketName, void functionref( string ) callbackReadFunc, int poolTimeInSec)
 {
     while(socketName in file.activeSocket && file.activeSocket[socketName])
     {
-        wait poolTimer
+        wait poolTimeInSec
 
         array< string > messages = PL_ReadFromWebsocket(socketName)
 
