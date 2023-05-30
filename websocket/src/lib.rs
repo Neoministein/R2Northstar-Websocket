@@ -147,6 +147,7 @@ async fn write_message(socket_name : String, message: String) {
 
 fn disconnect_from_server(socket_name: &String)
 {
+    RT.block_on(STREAM_MAP.lock().unwrap().get(socket_name).unwrap().write.lock().unwrap().close()).expect("issue closing websocket");
     STREAM_MAP.lock().unwrap().remove(socket_name);
 }
 
@@ -201,22 +202,27 @@ async fn connect_to_server(socket_name: String, url_string: String, headers: Str
 
                 let mut read_stream = split_read;
 
-                while let Some(message) = read_stream.next().await {
-                    let data = message.unwrap().into_data();
-                    let s = String::from_utf8(data).expect("Websocket provided invalid UTF-8");
+                while let Some(result) = read_stream.next().await {
+                    match result {
+                        Err(_) => log::warn!("Websocket [{socket_name}] closed unexpectedly"),
+                        Ok(message) => {
+                            let data = message.into_data();
+                            let s = String::from_utf8(data).expect("Websocket provided invalid UTF-8");
 
-                    log::trace!("Received message from Websocket [{:?}] message [{:?}]", socket_name_arc.clone() ,s.clone());
+                            log::trace!("Received message from Websocket [{:?}] message [{:?}]", socket_name_arc.clone() ,s.clone());
 
-                    let lock = {
-                        let socket_name_str = socket_name_arc.as_str().clone();
-                        let last_message_map = LAST_MESSAGE.lock().unwrap();
-                        let mut lock = last_message_map.get(socket_name_str).unwrap().clone();
-                        lock.push(s.clone());
-                        lock
-                    };
+                            let lock = {
+                                let socket_name_str = socket_name_arc.as_str().clone();
+                                let last_message_map = LAST_MESSAGE.lock().unwrap();
+                                let mut lock = last_message_map.get(socket_name_str).unwrap().clone();
+                                lock.push(s.clone());
+                                lock
+                            };
 
-                    let mut last_message_map = LAST_MESSAGE.lock().unwrap();
-                    last_message_map.insert(socket_name_arc.as_str().clone().to_string(), lock);
+                            let mut last_message_map = LAST_MESSAGE.lock().unwrap();
+                            last_message_map.insert(socket_name_arc.as_str().clone().to_string(), lock);
+                        },
+                    }
                 }
             });
             can_connect = true;
@@ -232,4 +238,13 @@ async fn connect_to_server(socket_name: String, url_string: String, headers: Str
     }
 
     can_connect
+}
+
+impl Drop for WebsocketPlugin {
+
+    fn drop(&mut self) {
+        for (key, _) in &*STREAM_MAP.lock().unwrap() {
+            disconnect_from_server(key)
+        }
+    }
 }
