@@ -133,11 +133,14 @@ async fn write_message(socket_name : String, message: String) {
         let write = &mut *write_mutex;
 
         // Send the message
-        write
-            .send(Message::Text(message.clone()))
-            .await
-            .expect("Failed to write the message");
-        log::trace!("Message for [{socket_name}] was sent successful [{message}]")
+        match write.send(Message::Text(message.clone())).await {
+            Ok(_) => {
+                log::trace!("Message for [{socket_name}] was sent successfully [{message}]");
+            }
+            Err(_) => {
+                log::warn!("Failed to write the message to [{socket_name}]");
+            }
+        }
 
     } else {
         // Handle the case when the WebSocketContainer is not found
