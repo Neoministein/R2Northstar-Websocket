@@ -103,9 +103,12 @@ fn sq_disconnect_from_server(socket_name: String) {
 fn sq_write_message(socket_name:String, message:String) {
     log::trace!("Writing to websocket [{socket_name}] message [{message}]");
 
-    RT.block_on(write_message(socket_name,message));
+    let write_successfully = RT.block_on(write_message(&socket_name, message));
 
-    sq_return_null!();
+    if !write_successfully {
+        disconnect_from_server(&socket_name);
+    }
+    sq_return_bool!(write_successfully, sqvm, sq_functions);
 }
 
 #[rrplug::sqfunction(VM=server,ExportName=PL_ReadFromWebsocket)]
@@ -121,13 +124,13 @@ fn get_last_messages(socket_name: String) -> Vec<String> {
     sq_return_notnull!()
 }
 
-async fn write_message(socket_name : String, message: String) {
+async fn write_message(socket_name : &String, message: String) -> bool {
 
     // Retrieve the map
     let map_lock = STREAM_MAP.lock().unwrap();
 
     // Get the WebSocketContainer from the map
-    if let Some(container) = map_lock.get(&socket_name) {
+    if let Some(container) = map_lock.get(socket_name) {
         // Access the write field of the WebSocketContainer
         let mut write_mutex = container.write.lock().unwrap();
         let write = &mut *write_mutex;
@@ -139,18 +142,28 @@ async fn write_message(socket_name : String, message: String) {
             }
             Err(_) => {
                 log::warn!("Failed to write the message to [{socket_name}]");
+                return false;
             }
         }
-
+        return true;
     } else {
         // Handle the case when the WebSocketContainer is not found
         log::warn!("There is no established connection for [{socket_name}]");
+        return false;
     }
 }
 
 fn disconnect_from_server(socket_name: &String)
 {
-    RT.block_on(STREAM_MAP.lock().unwrap().get(socket_name).unwrap().write.lock().unwrap().close()).expect("issue closing websocket");
+    match RT.block_on(STREAM_MAP.lock().unwrap().get(socket_name).unwrap().write.lock().unwrap().close()) {
+        Ok(_) => {
+            log::info!("Websocket [{socket_name}] closed successfully");
+        }
+        Err(_) => {
+            log::warn!("There was an issue closing the websocket [{socket_name}]");
+        }
+    }
+
     STREAM_MAP.lock().unwrap().remove(socket_name);
 }
 

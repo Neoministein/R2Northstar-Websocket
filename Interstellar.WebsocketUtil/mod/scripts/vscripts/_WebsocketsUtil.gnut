@@ -24,7 +24,10 @@ void function NS_WriteToWebsocket(string socketName, string message)
 {
     if(socketName in file.activeSocket && file.activeSocket[socketName])
     {
-        PL_WriteToWebsocket(socketName, message)
+        if(!PL_WriteToWebsocket(socketName, message))
+        {
+            file.activeSocket[socketName] <- false
+        }
     }
 }
 
