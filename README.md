@@ -19,7 +19,27 @@ There you can find the functions to interact with the websocket.
 - NS_ is for methods defined in the mod
 
 > Note that an open websocket won't be closed on Squirrel VM destruction
+## Functions
+- `PL_ConnectToWebsocket`
+	- Used to connect to socket.
+	- `socket_name`:  the name the socket is referred by.
+	- `url`: url of the websocket.
+	- `header`: a singel string from a tabel created with the `HeaderConverter` util function. 
+	- `returning`: successfully connected true/false.
+	
+- `PL_DisconnectFromWebsocket`: 
+	- Used to disconnect from the socket 
 
+- `PL_WriteToWebsocket`
+	-  Used to send a message to the webserver
+	- `socket_name`: name of the connected websocket. 
+	-  `message`: message for the server.
+
+- `PL_ReadFromWebsocket`
+	- Get all messages from connection since  last `PL_ReadFromWebsocket` call.
+	- `socket_name`: name of the connected websocket.
+	-  `returning`: string array containing all messages in chronological order.
+ 
 ## Developed by
 
 - [Fuchsiano](https://github.com/Fuchsiano)
