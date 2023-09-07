@@ -10,6 +10,8 @@ This plugin is used to allow using Websockets in Squirrel.
 
 > It is not necessary to install the mod but, for ease of use we recommend to also use it, due to some limitations in the plugin v2 API.
 
+> If you are using wine this plugin will only work when using version 6.11 and above 
+
 ## How to use the plugin/mod
 
 Look at the util file at `Interstellar.WebsocketUtil\mod\scripts\vscripts\_WebsocketsUtil.gnut`. 
