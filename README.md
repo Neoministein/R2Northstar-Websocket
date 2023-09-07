@@ -4,13 +4,15 @@ This plugin is used to allow using Websockets in Squirrel.
 
 ## Installing the Plugin
 
-1. Copy the `interstellar_websockets.dll` file into `%Titanfall2_InstallationFolder%/R2Northstar/plugins`
+1. Download the latest release of the plugin from the [release tab](https://github.com/Neoministein/R2Northstar-Websocket/releases)
 
-2. Copy the `Interstellar.WebsocketUtil` folder mod into `%Titanfall2_InstallationFolder%/R2Northstar/mods`
+2. Copy the `interstellar_websockets.dll` file into `%Titanfall2_InstallationFolder%/R2Northstar/plugins`
+
+3. Copy the `Interstellar.WebsocketUtil` folder mod into `%Titanfall2_InstallationFolder%/R2Northstar/mods`
 
 > It is not necessary to install the mod but, for ease of use we recommend to also use it, due to some limitations in the plugin v2 API.
 
-> If you are using wine this plugin will only work when using version 6.11 and above 
+> When using wine this plugin will only work when with version 7.13 and above.
 
 ## How to use the plugin/mod
 
