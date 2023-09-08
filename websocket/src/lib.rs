@@ -222,21 +222,32 @@ async fn connect_to_server(socket_name: String, url_string: String, headers: Str
                     match result {
                         Err(_) => log::warn!("Websocket [{socket_name}] closed unexpectedly"),
                         Ok(message) => {
-                            let data = message.into_data();
-                            let s = String::from_utf8(data).expect("Websocket provided invalid UTF-8");
+                            if message.is_text() {
+                                let s = message.into_text().expect("Websocket provided invalid string format");
+                                log::trace!("Received message from Websocket [{:?}] message [{:?}]", socket_name_arc.clone() ,s.clone());
 
-                            log::trace!("Received message from Websocket [{:?}] message [{:?}]", socket_name_arc.clone() ,s.clone());
+                                let lock = {
+                                    let socket_name_str = socket_name_arc.as_str().clone();
+                                    let last_message_map = LAST_MESSAGE.lock().unwrap();
+                                    let mut lock = last_message_map.get(socket_name_str).unwrap().clone();
+                                    lock.push(s.clone());
+                                    lock
+                                };
 
-                            let lock = {
-                                let socket_name_str = socket_name_arc.as_str().clone();
-                                let last_message_map = LAST_MESSAGE.lock().unwrap();
-                                let mut lock = last_message_map.get(socket_name_str).unwrap().clone();
-                                lock.push(s.clone());
-                                lock
-                            };
-
-                            let mut last_message_map = LAST_MESSAGE.lock().unwrap();
-                            last_message_map.insert(socket_name_arc.as_str().clone().to_string(), lock);
+                                let mut last_message_map = LAST_MESSAGE.lock().unwrap();
+                                last_message_map.insert(socket_name_arc.as_str().clone().to_string(), lock);
+                            } else if message.is_binary() {
+                                log::warn!("Unparseable Binary message received from Websocket [{:?}] data [{:?}]", socket_name_arc.clone(), message.into_data());
+                            } else if message.is_ping() {
+                                log::debug!("Ping message received from Websocket [{:?}]", socket_name_arc.clone());
+                            } else if message.is_pong() {
+                                log::debug!("Pong message received from Websocket [{:?}]", socket_name_arc.clone());
+                            } else if message.is_close() {
+                                log::info!("Close message received from Websocket [{:?}]", socket_name_arc.clone());
+                                break;
+                            } else {
+                                log::warn!("Single Websocket Frame detected from Websocket [{:?}]", socket_name_arc.clone());
+                            }
                         },
                     }
                 }
