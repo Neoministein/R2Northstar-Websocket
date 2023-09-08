@@ -1,7 +1,7 @@
 {
 	"Name" : "Interstellar.WebsocketUtil",
 	"Description" : "This is a helper mod to make it easier to work with the websocket plugin",
-    "Version": "1.0.0",
+    "Version": "1.0.1",
 	"LoadPriority": 0,
 
 	"ConVars": [
