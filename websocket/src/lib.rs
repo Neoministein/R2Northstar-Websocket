@@ -77,16 +77,26 @@ impl Plugin for WebsocketPlugin {
 entry!(WebsocketPlugin);
 
 #[rrplug::sqfunction(VM=server,ExportName=PL_ConnectToWebsocket)]
-fn sq_connect_to_server(socket_name: String, url: String, headers:String, connection_time_out: i32) -> bool {
+fn sq_connect_to_server(socket_name: String, url: String, headers:String, connection_time_out: i32, keep_alive : bool) -> bool {
     log::info!("Trying to establish websocket connection [{socket_name}] to [{url}]" );
+
+    let mut open_new_socket = true;
 
     if STREAM_MAP.lock().unwrap().contains_key(&socket_name)
     {
-        log::warn!("There is still a open websocket connection under [{socket_name}] closing websocket." );
-        disconnect_from_server(&socket_name);
+        if keep_alive {
+            log::info!("There is still a open websocket connection for [{socket_name}] keeping already existing socket.");
+            open_new_socket = false;
+        } else {
+            log::warn!("There is still a open websocket connection for [{socket_name}] closing websocket." );
+            disconnect_from_server(&socket_name);
+        }
     }
 
-    let was_success = RT.block_on(connect_to_server(socket_name,url,headers, connection_time_out as u64));
+    let mut was_success = true;
+    if open_new_socket {
+        was_success = RT.block_on(connect_to_server(socket_name,url,headers, connection_time_out as u64));
+    }
 
     sq_return_bool!(was_success, sqvm, sq_functions);
 }

@@ -28,7 +28,9 @@ There you can find the functions to interact with the websocket.
 	- Used to connect to socket.
 	- `socket_name`:  the name the socket is referred by.
 	- `url`: url of the websocket.
-	- `header`: a singel string from a tabel created with the `HeaderConverter` util function. 
+	- `header`: a singel string from a tabel created with the `HeaderConverter` util function.
+    - `connection_time_out`: how long the socket should wait in sec on initial connection before timing out.
+    - `keep_alive`: boolean if the connection should be kept alive if there is one already with the same socket_name
 	- `returning`: successfully connected true/false.
 	
 - `PL_DisconnectFromWebsocket`: 

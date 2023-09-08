@@ -11,9 +11,9 @@ struct {
     table < string , bool> activeSocket
 } file
 
-bool function NS_ConnectToWebsocket(string socketName, string url, void functionref( string ) callbackReadFunc, int poolTimeInSec = 1, table<string,string> headers = {}, int connectionTimeout = 5)
+bool function NS_ConnectToWebsocket(string socketName, string url, void functionref( string ) callbackReadFunc, int poolTimeInSec = 1, bool keepExistingSocketAlive = false, table<string,string> headers = {}, int connectionTimeout = 5)
 {
-    file.activeSocket[socketName] <- PL_ConnectToWebsocket(socketName, url, HeaderConverter(headers) ,connectionTimeout)
+    file.activeSocket[socketName] <- PL_ConnectToWebsocket(socketName, url, HeaderConverter(headers), connectionTimeout, keepExistingSocketAlive)
 
     thread NS_PoolWebsocket(socketName, callbackReadFunc, poolTimeInSec)
 
