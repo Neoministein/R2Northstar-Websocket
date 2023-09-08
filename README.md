@@ -40,9 +40,12 @@ There you can find the functions to interact with the websocket.
 	-  `message`: message for the server.
 
 - `PL_ReadFromWebsocket`
-	- Get all messages from connection since  last `PL_ReadFromWebsocket` call.
+	- Get all messages from connection since last `PL_ReadFromWebsocket` call.
 	- `socket_name`: name of the connected websocket.
-	-  `returning`: string array containing all messages in chronological order.
+	- `returning`: string array containing all messages in chronological order.
+- `PL_GetOpenWebsockets`
+  - Get all open websocket connection names.
+  - `returning`: string array containing open websocket connection names.
  
 ## Developed by
 

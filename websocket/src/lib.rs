@@ -68,6 +68,7 @@ impl Plugin for WebsocketPlugin {
         _ = plugin_data.register_sq_functions(info_sq_disconnect_from_server);
         _ = plugin_data.register_sq_functions(info_sq_write_message);
         _ = plugin_data.register_sq_functions(info_get_last_messages);
+        _ = plugin_data.register_sq_functions(info_get_open_connections);
     }
 
     fn main(&self) {}
@@ -120,6 +121,16 @@ fn get_last_messages(socket_name: String) -> Vec<String> {
     last_message_map.get_mut(&socket_name).unwrap().clear();
 
     push_sq_array(sqvm, sq_functions, lock);
+
+    sq_return_notnull!()
+}
+
+#[rrplug::sqfunction(VM=server,ExportName=PL_GetOpenWebsockets)]
+fn get_open_connections() -> Vec<String> {
+
+    let keys = STREAM_MAP.lock().unwrap().keys().cloned().collect::<Vec<String>>();
+
+    push_sq_array(sqvm, sq_functions, keys);
 
     sq_return_notnull!()
 }
