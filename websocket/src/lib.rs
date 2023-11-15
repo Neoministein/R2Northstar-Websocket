@@ -1,10 +1,4 @@
 use rrplug::prelude::*;
-use rrplug::{
-    sq_return_bool, sq_return_notnull, sq_return_null,
-    wrappers::{
-        squirrel::push_sq_array,
-    },
-};
 
 use std::{
     collections::HashMap,
@@ -57,26 +51,20 @@ pub struct WebsocketPlugin
 
 
 impl Plugin for WebsocketPlugin {
-    type SaveType = squirrel::Save;
+    fn new(plugin_data: &PluginData) -> Self {
+        plugin_data.register_sq_functions(sq_connect_to_server);
+        plugin_data.register_sq_functions(sq_disconnect_from_server);
+        plugin_data.register_sq_functions(sq_write_message);
+        plugin_data.register_sq_functions(get_last_messages);
+        plugin_data.register_sq_functions(get_open_connections);
 
-    fn new() -> Self {
         Self {}
     }
-
-    fn initialize(&mut self, plugin_data: &PluginData) {
-        _ = plugin_data.register_sq_functions(info_sq_connect_to_server);
-        _ = plugin_data.register_sq_functions(info_sq_disconnect_from_server);
-        _ = plugin_data.register_sq_functions(info_sq_write_message);
-        _ = plugin_data.register_sq_functions(info_get_last_messages);
-        _ = plugin_data.register_sq_functions(info_get_open_connections);
-    }
-
-    fn main(&self) {}
 }
 
 entry!(WebsocketPlugin);
 
-#[rrplug::sqfunction(VM=server,ExportName=PL_ConnectToWebsocket)]
+#[rrplug::sqfunction(VM= "server",ExportName="PL_ConnectToWebsocket")]
 fn sq_connect_to_server(socket_name: String, url: String, headers:String, connection_time_out: i32, keep_alive : bool) -> bool {
     log::info!("Trying to establish websocket connection [{socket_name}] to [{url}]" );
 
@@ -98,20 +86,17 @@ fn sq_connect_to_server(socket_name: String, url: String, headers:String, connec
         was_success = RT.block_on(connect_to_server(socket_name,url,headers, connection_time_out as u64));
     }
 
-    sq_return_bool!(was_success, sqvm, sq_functions);
+    return was_success;
 }
 
-#[rrplug::sqfunction(VM=server,ExportName=PL_DisconnectFromWebsocket)]
+#[rrplug::sqfunction(VM="server",ExportName="PL_DisconnectFromWebsocket")]
 fn sq_disconnect_from_server(socket_name: String) {
     log::info!("Disconnecting websocket client [{socket_name}]");
-
     disconnect_from_server(&socket_name);
-
-    sq_return_null!();
 }
 
-#[rrplug::sqfunction(VM=server,ExportName=PL_WriteToWebsocket)]
-fn sq_write_message(socket_name:String, message:String) {
+#[rrplug::sqfunction(VM="server",ExportName="PL_WriteToWebsocket")]
+fn sq_write_message(socket_name:String, message:String) -> bool {
     log::trace!("Writing to websocket [{socket_name}] message [{message}]");
 
     let write_successfully = RT.block_on(write_message(&socket_name, message));
@@ -119,30 +104,23 @@ fn sq_write_message(socket_name:String, message:String) {
     if !write_successfully {
         disconnect_from_server(&socket_name);
     }
-    sq_return_bool!(write_successfully, sqvm, sq_functions);
+    return write_successfully;
 }
 
-#[rrplug::sqfunction(VM=server,ExportName=PL_ReadFromWebsocket)]
+#[rrplug::sqfunction(VM="server",ExportName="PL_ReadFromWebsocket")]
 fn get_last_messages(socket_name: String) -> Vec<String> {
     log::trace!("Trying to read from the websocket [{socket_name}] buffer");
 
     let mut last_message_map = LAST_MESSAGE.lock().unwrap();
-    let  lock = last_message_map.get(&socket_name.clone()).unwrap().to_vec().clone();
+    let lock = last_message_map.get(&socket_name.clone()).unwrap().to_vec().clone();
     last_message_map.get_mut(&socket_name).unwrap().clear();
 
-    push_sq_array(sqvm, sq_functions, lock);
-
-    sq_return_notnull!()
+    return lock;
 }
 
-#[rrplug::sqfunction(VM=server,ExportName=PL_GetOpenWebsockets)]
+#[rrplug::sqfunction(VM="server",ExportName="PL_GetOpenWebsockets")]
 fn get_open_connections() -> Vec<String> {
-
-    let keys = STREAM_MAP.lock().unwrap().keys().cloned().collect::<Vec<String>>();
-
-    push_sq_array(sqvm, sq_functions, keys);
-
-    sq_return_notnull!()
+    return STREAM_MAP.lock().unwrap().keys().cloned().collect::<Vec<String>>();
 }
 
 async fn write_message(socket_name : &String, message: String) -> bool {

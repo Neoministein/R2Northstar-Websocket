@@ -351,12 +351,9 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.17"
+version = "0.4.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "abb12e687cfb44aa40f41fc3978ef76448f9b6038cad6aef4259d3c095a2382e"
-dependencies = [
- "cfg-if",
-]
+checksum = "b5e6163cb8c49088c2c36f57875e58ccd8c87c7427f7fbd50ea6710b2f3f2e8f"
 
 [[package]]
 name = "mio"
@@ -400,9 +397,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.17.1"
+version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7e5500299e16ebb147ae15a00a942af264cf3688f47923b8fc2cd5858f23ad3"
+checksum = "dd8b5dd2ae5ed71462c540258bedcb51965123ad7e7ccf4b9a8cafaa4a63576d"
 
 [[package]]
 name = "openssl"
@@ -503,9 +500,9 @@ checksum = "5b40af805b3121feab8a3c29f04d8ad262fa8e0561883e7653e024ae4479e6de"
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.58"
+version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa1fb82fc0c281dd9671101b66b771ebbe1eaf967b96ac8740dcba4b70005ca8"
+checksum = "134c189feb4956b20f6f547d2cf727d4c0fe06722b20a0eec87ed445a97f92da"
 dependencies = [
  "unicode-ident",
 ]
@@ -569,9 +566,9 @@ dependencies = [
 
 [[package]]
 name = "rrplug"
-version = "2.1.0"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ea2b8ec6787071b3960a5a233e360fa51757a0bd42ee753926b9aff73b8529e"
+checksum = "f5a67ff1c1d55e85436570c3c6b2f2305933c5d05bd580e42d415c8f6e2d9394"
 dependencies = [
  "log",
  "once_cell",
@@ -582,10 +579,11 @@ dependencies = [
 
 [[package]]
 name = "rrplug_proc"
-version = "2.1.0"
+version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a0f24d21bb3d778281eca27eec0bb9ce85f6ddf1a87001ac12cde6216c4502b"
+checksum = "930d71becdab7212381db722301476c0a057d16ed1c13ece20c44e7049134ca4"
 dependencies = [
+ "proc-macro2",
  "quote",
  "syn",
 ]

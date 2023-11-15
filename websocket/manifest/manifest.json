@@ -2,7 +2,7 @@
 	"name": "Interstellar.Websocket",
 	"displayname": "Websocket",
 	"description": "Websockets integration",
-	"api_version": "2",
+	"api_version": "3",
 	"version": "1.0",
 	"run_on_server": true,
 	"run_on_client": false
