@@ -51,20 +51,23 @@ pub struct WebsocketPlugin
 
 
 impl Plugin for WebsocketPlugin {
-    fn new(plugin_data: &PluginData) -> Self {
-        plugin_data.register_sq_functions(sq_connect_to_server);
-        plugin_data.register_sq_functions(sq_disconnect_from_server);
-        plugin_data.register_sq_functions(sq_write_message);
-        plugin_data.register_sq_functions(get_last_messages);
-        plugin_data.register_sq_functions(get_open_connections);
+    const PLUGIN_INFO: PluginInfo =
+        PluginInfo::new(c"INTERSTELLAR-WEBSOCKET", c"WEBSOCKET", c"INTERSTELLAR_WEBSOCKET", PluginContext::all());
 
+    fn new(_reloaded: bool) -> Self {
+        register_sq_functions(sq_connect_to_server);
+        register_sq_functions(sq_disconnect_from_server);
+        register_sq_functions(sq_write_message);
+        register_sq_functions(sq_get_last_messages);
+        register_sq_functions(sq_get_open_connections);
+        log::info!("Interstellar Websocket Plugin loaded");
         Self {}
     }
 }
 
 entry!(WebsocketPlugin);
 
-#[rrplug::sqfunction(VM= "server",ExportName="PL_ConnectToWebsocket")]
+#[rrplug::sqfunction(VM= "SERVER",ExportName="PL_ConnectToWebsocket")]
 fn sq_connect_to_server(socket_name: String, url: String, headers:String, connection_time_out: i32, keep_alive : bool) -> bool {
     log::info!("Trying to establish websocket connection [{socket_name}] to [{url}]" );
 
@@ -89,13 +92,13 @@ fn sq_connect_to_server(socket_name: String, url: String, headers:String, connec
     return was_success;
 }
 
-#[rrplug::sqfunction(VM="server",ExportName="PL_DisconnectFromWebsocket")]
+#[rrplug::sqfunction(VM="SERVER",ExportName="PL_DisconnectFromWebsocket")]
 fn sq_disconnect_from_server(socket_name: String) {
     log::info!("Disconnecting websocket client [{socket_name}]");
     disconnect_from_server(&socket_name);
 }
 
-#[rrplug::sqfunction(VM="server",ExportName="PL_WriteToWebsocket")]
+#[rrplug::sqfunction(VM="SERVER",ExportName="PL_WriteToWebsocket")]
 fn sq_write_message(socket_name:String, message:String) -> bool {
     log::trace!("Writing to websocket [{socket_name}] message [{message}]");
 
@@ -107,8 +110,8 @@ fn sq_write_message(socket_name:String, message:String) -> bool {
     return write_successfully;
 }
 
-#[rrplug::sqfunction(VM="server",ExportName="PL_ReadFromWebsocket")]
-fn get_last_messages(socket_name: String) -> Vec<String> {
+#[rrplug::sqfunction(VM="SERVER",ExportName="PL_ReadFromWebsocket")]
+fn sq_get_last_messages(socket_name: String) -> Vec<String> {
     log::trace!("Trying to read from the websocket [{socket_name}] buffer");
 
     let mut last_message_map = LAST_MESSAGE.lock().unwrap();
@@ -118,8 +121,8 @@ fn get_last_messages(socket_name: String) -> Vec<String> {
     return lock;
 }
 
-#[rrplug::sqfunction(VM="server",ExportName="PL_GetOpenWebsockets")]
-fn get_open_connections() -> Vec<String> {
+#[rrplug::sqfunction(VM="SERVER",ExportName="PL_GetOpenWebsockets")]
+fn sq_get_open_connections() -> Vec<String> {
     return STREAM_MAP.lock().unwrap().keys().cloned().collect::<Vec<String>>();
 }
 
@@ -226,7 +229,7 @@ async fn connect_to_server(socket_name: String, url_string: String, headers: Str
                                 log::trace!("Received message from Websocket [{:?}] message [{:?}]", socket_name_arc.clone() ,s.clone());
 
                                 let lock = {
-                                    let socket_name_str = socket_name_arc.as_str().clone();
+                                    let socket_name_str = socket_name_arc.as_str();
                                     let last_message_map = LAST_MESSAGE.lock().unwrap();
                                     let mut lock = last_message_map.get(socket_name_str).unwrap().clone();
                                     lock.push(s.clone());
@@ -234,18 +237,18 @@ async fn connect_to_server(socket_name: String, url_string: String, headers: Str
                                 };
 
                                 let mut last_message_map = LAST_MESSAGE.lock().unwrap();
-                                last_message_map.insert(socket_name_arc.as_str().clone().to_string(), lock);
+                                last_message_map.insert(socket_name_arc.as_str().to_string(), lock);
                             } else if message.is_binary() {
-                                log::warn!("Unparseable Binary message received from Websocket [{:?}] data [{:?}]", socket_name_arc.clone(), message.into_data());
+                                log::warn!("Unparseable Binary message received from Websocket [{:?}] data [{:?}]", socket_name_arc, message.into_data());
                             } else if message.is_ping() {
-                                log::debug!("Ping message received from Websocket [{:?}]", socket_name_arc.clone());
+                                log::debug!("Ping message received from Websocket [{:?}]", socket_name_arc);
                             } else if message.is_pong() {
-                                log::debug!("Pong message received from Websocket [{:?}]", socket_name_arc.clone());
+                                log::debug!("Pong message received from Websocket [{:?}]", socket_name_arc);
                             } else if message.is_close() {
-                                log::info!("Close message received from Websocket [{:?}]", socket_name_arc.clone());
+                                log::info!("Close message received from Websocket [{:?}]", socket_name_arc);
                                 break;
                             } else {
-                                log::warn!("Single Websocket Frame detected from Websocket [{:?}]", socket_name_arc.clone());
+                                log::warn!("Single Websocket Frame detected from Websocket [{:?}]", socket_name_arc);
                             }
                         },
                     }
